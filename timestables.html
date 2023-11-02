@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+
+<head>
+    <script defer type="module">
+        import * as uuid from 'https://cdn.jsdelivr.net/npm/uuid@9.0.1/+esm'
+        window.uuid = { ...uuid }
+        delete window.uuid.default
+        window.require = (...args) => {
+            return (...args) => {
+                return ({})
+            }
+        }
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/dolphinsr@0.0.2/dist/bundle.min.js"></script>
+    <script type="module">
+        const { DolphinSR, generateId } = window.dolphinsr;
+        const { vocab = [], reviews = [] } = JSON.parse(localStorage.getItem("dolphinsr")) || {};
+        for (const review of reviews) review.ts = new Date(new Date(review.ts).setMonth(8));
+        if (vocab.length === 0) {
+
+            for (let i = 2; i <= 12; i++) {
+                vocab.push({
+                    id: generateId(),
+                    combinations: [
+                        { front: [0], back: [1] }
+                    ],
+                    fields: [`${i} x ${i}`, `${i * i}`]
+                })
+                for (let j = i + 1; j <= 12; j++) {
+                    vocab.push({
+                        id: generateId(),
+                        combinations: [
+                            { front: [0], back: [2] },
+                            { front: [1], back: [2] }
+                        ],
+                        fields: [`${i} x ${j}`, `${j} x ${i}`, `${i * j}`]
+                    })
+                }
+            }
+        }
+        const d = new DolphinSR();
+        d.addMasters(...vocab);
+        // for (const card of vocab) {
+        //     for (const combination of card.combinations)
+        //     reviews.push({
+        //         master: card.id,
+        //         combination: combination,
+        //         ts: new Date(new Date().setDate(new Date().getDate() - 1)),
+        //         rating: "easy"
+
+        //     })
+        // }
+        d.addReviews(...reviews);
+
+
+        async function install() {
+            if (document.readyState === "loading") await new Promise(res => document.addEventListener("DOMContentLoaded"), res)
+            const form = document.querySelector("form");
+            form.setAttribute("state", "front");
+            let card = d.nextCard();
+            function show() {
+                console.log(d, d.summary())
+                if (card) {
+                    document.querySelector("#front").textContent = card.front.join(" ")
+                    document.querySelector("#back").textContent = card.back.join(" ")
+                }
+
+            }
+
+            form.addEventListener("submit", e => {
+                if (e.submitter.id === "show") {
+                    form.setAttribute("state", "back");
+                } else {
+                    form.setAttribute("state", "front");
+                    const review = {
+                        // identify which card we're reviewing
+                        master: card.master,
+                        combination: card.combination,
+
+                        // store when we reviewed it
+                        ts: new Date(),
+
+                        // store how easy it was to remember
+                        rating: e.submitter.id
+                    };
+                    reviews.push(review);
+                    d.addReviews(review);
+                    localStorage.setItem("dolphinsr", JSON.stringify({ vocab, reviews }));
+                    card = d.nextCard();
+                }
+                show();
+                e.preventDefault()
+                return false;
+            })
+            show();
+        }
+        install()
+    </script>
+    <style>
+        form {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: grid;
+            grid: "front front front front"
+                "back back back back"
+                ". . . ."
+                "again hard good easy" / auto;
+            grid-template-rows: max-content max-content 1fr max(2em, 48px);
+        }
+
+        [state="front"] #show {
+            grid-column: 1 / -1;
+            grid-row-start: again;
+            grid-row-end: easy;
+        }
+
+        form:not([state="front"]) #show {
+            display: none;
+        }
+
+        /** friendly pastel colours */
+        body {
+            margin: 0;
+            background: #f5f5f5;
+            color: #333;
+            font-family: sans-serif;
+            font-size: min(30vw, max(10vh, 2em));
+        }
+
+        button {
+            outline: none;
+            border: none;
+            background: slategrey;
+            color: white;
+        }
+
+        #front,
+        #back {
+            text-align: center;
+        }
+
+        form[state="front"] #easy,
+        form[state="front"] #good,
+        form[state="front"] #hard,
+        form[state="front"] #again,
+        form[state="front"] #back {
+            display: none;
+        }
+
+        #front {
+            grid-area: front;
+        }
+
+        #back {
+            grid-area: back;
+        }
+
+        #easy {
+            grid-area: easy;
+        }
+
+        #good {
+            grid-area: good;
+        }
+
+        #hard {
+            grid-area: hard;
+        }
+
+        #again {
+            grid-area: again;
+        }
+    </style>
+</head>
+
+<body>
+    <form>
+        <span id="front"></span>
+        <span id="back"></span>
+
+        <button id="show">Show Me</button>
+        <button id="again">Again</button>
+        <button id="hard">Hard</button>
+        <button id="good">Good</button>
+        <button id="easy">Easy</button>
+    </form>
+</body>
